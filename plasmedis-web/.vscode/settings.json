@@ -1,0 +1,18 @@
+		
+{ 
+  "files.eol": "\n",
+  
+  // Set the default
+  "eslint.validate": [
+      "javascript",
+      "jsx"
+  ],
+
+  "editor.codeActionsOnSaveTimeout": 1000,
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "never",
+    "source.organizeImports": "never",
+    "source.fixAll.eslint": "explicit"
+  },
+}

@@ -1,0 +1,167 @@
+version: "3.5"
+
+services:
+  emtu-db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-1234}
+      PGDATA: /data/postgres
+    volumes:
+      - ./data/postgres:/data/postgres
+      - ./emtu-api:/node_app
+    ports:
+      - "54320:5432"
+    networks:
+      - emtu_network
+    restart: unless-stopped
+
+  emtu-api:
+    tty: true
+    stdin_open: true
+    image: node:16
+    command: make emtu-api-startup
+    # build:
+    #   context: ./emtu-api/
+    #   dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ./emtu-api:/app
+    ports:
+      - 3333:3333
+      - 9229:9229
+    env_file:
+      - ./emtu-api/.env
+    depends_on:
+      - postgres
+    networks:
+      - gerneral_network
+
+  emtu-web:
+    tty: true
+    stdin_open: true
+    env_file:
+      - ./emtu-web/.env
+    image: node:16
+    working_dir: /app
+    command: make emtu-web-startup
+    ports:
+      - 3000:3000
+    volumes:
+      - ./emtu-web:/app
+
+  plasmedis-api:
+    image: thisk8brd/flask-api
+    container_name: plasmedis-api-container
+    build:
+      context: ./plasmedis-api
+      dockerfile: ./Dockerfile
+      target: debug
+    ports:
+      - 5000:5000
+      - 5678:5678
+    volumes:
+      - ./plasmedis-api:/usr/src/app
+    environment:
+      - FLASK_DEBUG=1
+    env_file:
+      - ./plasmedis-api/.env
+    depends_on:
+      - postgres
+    entrypoint: [ "python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "app",  "--wait-for-client", "--multiprocess", "-m", "flask", "run", "-h", "0.0.0.0", "-p", "5000" ]
+
+  plasmedisDb:
+    image: postgres:13
+    container_name: plasmedisDb-container
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-1234}
+      PGDATA: /data/postgres
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres-plasmedis:/data/postgres
+    networks:
+      - plasmedis_network
+
+  plasmedis-web:
+    tty: true
+    stdin_open: true
+    container_name: plasmedis-web-container
+    env_file:
+      - ./plasmedis-web/.env
+    image: node:16
+    working_dir: /app
+    command: make plasmedis-web-startup
+    ports:
+      - 3001:3000
+    volumes:
+      -  ./plasmedis-web:/app
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+
+  graacc-web:
+    tty: true
+    stdin_open: true
+    image: node:18
+    working_dir: /app
+    command: make graacc-web-startup
+    ports:
+      - 3002:3000
+    volumes:
+      - ./graacc-web:/app
+    tmpfs: /tmp
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+
+  graacc-api-mock:
+    image: "wiremock/wiremock:latest"
+    volumes:
+      - ./graacc-api-mock/mappings:/home/wiremock/mappings
+    ports:
+      - 8080:8080
+
+  postgres:
+    image: postgres:13
+    container_name: postgres-container
+    env_file:
+      - ./postgres/.env
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres:/data/postgres
+      - ./postgres:/docker-entrypoint-initdb.d
+      - ./emtu-api:/emtu
+    networks:
+      - gerneral_network
+
+  nginx:
+    container_name: nginx
+    restart: unless-stopped
+    image: nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+        - ./nginx.conf:/etc/nginx/nginx.conf
+        - ./certbot/conf:/etc/letsencrypt
+        - ./certbot/www:/var/www/certbot
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --force-renewal --email {digite_seu_email} -d {digite_seu_dominio} --agree-tos
+
+
+networks:
+  emtu_network:
+    driver: bridge
+  plasmedis_network:
+    driver: bridge
+  gerneral_network:
+    driver: bridge

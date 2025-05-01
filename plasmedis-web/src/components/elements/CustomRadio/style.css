@@ -1,0 +1,7 @@
+.chakra-radio {
+  align-items: start !important;
+}
+
+.chakra-radio__label {
+  margin-top: -4px;
+}
